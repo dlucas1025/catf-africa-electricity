@@ -1,0 +1,393 @@
+---
+title: "CATF Project Work for Q3"
+subtitle: ""
+author: "Lucas Duan"
+date: today
+format:
+  beamer:
+    theme: Madrid
+    colortheme: default
+    fonttheme: serif
+    aspectratio: 169
+    slide-level: 2
+    toc: false
+    incremental: false
+    pdf-engine: pdflatex
+    keep-tex: false
+editor: source
+---
+
+```{r setup, include=FALSE}
+library(gridExtra)
+library(tidyverse)
+library(knitr)
+library(cowplot)
+
+knitr::opts_chunk$set(
+  echo = FALSE,
+  include = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  results = "markup",
+  fig.width = 6,
+  fig.height = 3.5,
+  fig.align = "center",
+  out.width = "80%"
+)
+```
+
+```{r load-data, echo=FALSE}
+CATF_data <- read_csv("CATF_data.csv")
+```
+
+```{r clean_data, include=FALSE}
+# Clean the data
+# Keep this minimal: only collapse repeated country rows into one row per country
+
+stat_mode <- function(x) {
+  x <- x[!is.na(x)]
+  if (length(x) == 0) return(NA)
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+numeric_cols <- CATF_data |>
+  select(where(is.numeric)) |>
+  names()
+
+character_cols <- CATF_data |>
+  select(where(is.character), -country) |>
+  names()
+
+CATF_clean <- CATF_data |>
+  group_by(country) |>
+  summarise(
+    across(
+      all_of(numeric_cols),
+      ~ if (all(is.na(.x))) NA_real_ else median(.x, na.rm = TRUE)
+    ),
+    across(all_of(character_cols), stat_mode),
+    n_sources = n(),
+    .groups = "drop"
+  )
+```
+
+```{r intro-text, results='asis'}
+cat("
+## Introduction
+
+**Overall Theme:** Factors associated with electricity access and performance in African countries.
+
+**Research Goal:** This project investigates how economic development, infrastructure reliability, and renewable energy adoption relate to electricity access and performance across African countries.
+
+**Target Population:** African countries included in the CATF electricity dataset, with each observation representing national-level electricity systems and economic indicators.
+
+**Audience:** This analysis is intended for policy researchers and organizations interested in energy development, such as energy policy analysts, environmental organizations like Clean Air Task Force (CATF), and stakeholders working on improving electricity access and infrastructure in Africa.
+")
+```
+
+```{r data-summary-text, results='asis'}
+cat("
+## Data Summary
+
+**Key Variables:**
+
+- **GDP per capita:** Economic development indicator
+- **Urban electricity access rate:** Percentage of urban population with electricity access
+- **Rural electricity access rate:** Percentage of rural population with electricity access
+- **SAIDI:** Electricity outage duration
+- **Renewable electricity generation share:** Percentage of electricity generation from renewables
+
+**Data Wrangling:**
+
+- The raw CATF dataset contains multiple rows for each country.
+- To create one country-level dataset, repeated country rows were collapsed into a single row.
+- Numeric variables were aggregated using the median.
+- Character variables were aggregated using the mode.
+")
+```
+
+```{r q1-text, results='asis'}
+cat("
+## Question #1: [Name - Question Statement]
+
+[Clear statement of the research question]
+
+## Q1: Variables & Approach
+
+**Variables used:**
+
+[List variables]
+
+**New variables/groups defined:**
+
+[Any created variables]
+
+## Q1: Visualization
+")
+```
+
+```{r q1-plot}
+iris |>
+  ggplot(aes(x = Species, y = Sepal.Length)) +
+  geom_boxplot() +
+  ylab("Sepal Length")
+```
+
+```{r q1-table-text, results='asis'}
+cat("
+## Q1: Summary Table
+")
+```
+
+```{r q1-table}
+iris |>
+  group_by(Species) |>
+  summarise(
+    Count = n(),
+    `Avg Sepal Length` = round(mean(Sepal.Length), 1),
+    `Avg Petal Length` = round(mean(Petal.Length), 1)
+  ) |>
+  kable(caption = "Comparison of Iris Species")
+```
+
+```{r q1-insights-text, results='asis'}
+cat("
+## Insights for Q1
+")
+```
+
+```{r q2-text, results='asis'}
+cat("
+## Question #2: [Name - Question Statement]
+
+How large is the gap between urban and rural electricity access across African countries?
+
+## Q2: Variables & Approach
+
+**Variables used:**
+
+- `urban_access_electricity_rate` - percentage of urban population with electricity access
+- `rural_access_electricity_rate` - percentage of rural population with electricity access
+- `country`
+
+**New variables defined:**
+
+- `access_gap = urban_access_electricity_rate - rural_access_electricity_rate`
+
+This measures the inequality between urban and rural electricity access.
+
+## Q2: Visualization
+")
+```
+
+```{r q2-plot}
+CATF_data <- CATF_data |>
+  mutate(
+    urban_access_electricity_rate = as.numeric(urban_access_electricity_rate),
+    rural_access_electricity_rate = as.numeric(rural_access_electricity_rate)
+  )
+
+country_avg <- CATF_data |>
+  filter(
+    urban_access_electricity_rate >= 0 & urban_access_electricity_rate <= 100,
+    rural_access_electricity_rate >= 0 & rural_access_electricity_rate <= 100
+  ) |>
+  group_by(country) |>
+  summarise(
+    avg_urban_access = mean(urban_access_electricity_rate, na.rm = TRUE),
+    avg_rural_access = mean(rural_access_electricity_rate, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  mutate(
+    access_gap = avg_urban_access - avg_rural_access
+  )
+
+country_avg |>
+  ggplot(aes(x = access_gap)) +
+  geom_histogram(bins = 15, fill = "steelblue", color = "white") +
+  labs(
+    title = "Distribution of Urban–Rural Electricity Access Gap (Country Averages)",
+    x = "Urban - Rural Electricity Access Gap (%)",
+    y = "Number of Countries"
+  )
+```
+
+```{r q2-table-text, results='asis'}
+cat("
+## Q2: Summary Table
+")
+```
+
+```{r q2-table}
+country_avg |>
+  summarise(
+    Countries = n(),
+    `Average Urban Access (%)` = round(mean(avg_urban_access), 1),
+    `Average Rural Access (%)` = round(mean(avg_rural_access), 1),
+    `Average Access Gap (%)` = round(mean(access_gap), 1),
+    `Largest Gap (%)` = round(max(access_gap), 1)
+  ) |>
+  kable(caption = "Urban and Rural Electricity Access (Country Averages)")
+```
+
+```{r q3-text, results='asis'}
+cat("
+## Question #3: Lucas - Which countries have the highest outage duration, and how is outage duration distirbuted across African countries?
+
+## Q3: Relevance & Connection to CATF
+
+This question is relevant to CATF because electricity access alone does not show whether electricity is reliable. A country may have access to electricity, but if outages are frequent or long, electricity is reliable. A country may have access to electricity, but if outages are frequent or long, electricity service is still weak in practice. Looking at outage duration helps show which countries face the greatest reliability problems and where stronger infrasture or policy support may be needed.
+
+
+## Q3: Variables & Data Wrangling
+
+**Variables used:**
+
+- `country`: identifies each country in the dataset
+- `SAIDI`: System Average Interruption Duration Index, measures the average total duration of electricity outages experienced over a year; higher values indicate poorer reliability.
+
+**Data wrangling steps:**
+
+- Use the cleaned country-level dataset `CATF_clean`
+- Remove countries with missing and invalid `SAIDI` values
+- Rank (Sort) countries by `SAIDI` to identify those with the longest outage durations
+- Select the top 10 countries for the comparison bar chart
+
+## Q3: Visualization
+")
+```
+
+```{r q3-plot, fig-cap="Left: distribution of outage duration across African countries. Right: the 10 countries with the highest outage duration values in the cleaned CATF dataset."}
+
+cat("The histogram shows the overall distribution of outage duration, while the bar chart highlights the countries with the highest outage durations.")
+
+q3_saidi <- CATF_clean |>
+  filter(!is.na(SAIDI), is.finite(SAIDI))
+
+q3_top10 <- q3_saidi |>
+  arrange(desc(SAIDI)) |>
+  slice_head(n = 10) |>
+  mutate(country = forcats::fct_reorder(country, SAIDI))
+
+p_hist <- ggplot(q3_saidi, aes(x = SAIDI)) +
+  geom_histogram(bins = 12, fill = "steelblue", color = "white") +
+  labs(
+    title = "Distribution of Electricity Outage Duration",
+    x = "SAIDI (hours of outage per year)",
+    y = "Number of Countries"
+  ) +
+  theme_minimal(base_size = 10)
+
+p_bar <- ggplot(q3_top10, aes(x = country, y = SAIDI)) +
+  geom_col(fill = "darkorange") +
+  coord_flip() +
+  labs(
+    title = "Top 10 Countries with the Longest Outage Duration",
+    x = "Country",
+    y = "SAIDI (hours of outage per year)"
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(axis.text.y = element_text(size = 8))
+
+cowplot::plot_grid(p_hist, p_bar, ncol = 2, align = "h")
+```
+
+```{r q3-table-text, results='asis'}
+cat("
+## Q3: Summary Table
+
+The table summarizes the central tendency and spread of outage duration across countries.
+")
+```
+
+```{r q3-table}
+q3_saidi |>
+  summarise(
+    Countries = n(),
+    `Mean SAIDI` = round(mean(SAIDI), 1),
+    `Median SAIDI` = round(median(SAIDI), 1),
+    `Standard Deviation of SAIDI` = round(sd(SAIDI), 1),
+    `Variance of SAIDI` = round(var(SAIDI), 1),
+    `IQR SAIDI` = round(IQR(SAIDI), 1),
+    `Minimum SAIDI` = round(min(SAIDI), 1),
+    `Maximum SAIDI` = round(max(SAIDI), 1)
+  ) |>
+  knitr::kable(
+    caption = "Summary statistics for outage duration across African countries",
+    align = "c"
+  )
+```
+
+```{r q3-insights-text, results='asis'}
+cat("
+## Q3: Insights
+
+- Outage duration varies substantially across countries, showing uneven electricity reliability across Africa.
+The countries with the highest outage durations stand out clearly, suggesting that some systems face much more severe reliability problems than others.
+The mean is higher than the median which indicates a right-skewed distribution driven by a smaller number of countries with especially long outages.
+This supports CATF's broader concernw ith electricity system performance, not just electricity access.
+
+## Q3: Limitations
+
+- Some countries are excluded because `SAIDI` is missing, so the results may not reflect the full region. Future work could use a more complete dataset or imputation strategy.
+- This is a country-level analysis, so it hides within-country differences in reliability. Future work could compare regions, urban areas, and rural areas separately.
+- The analysis is descriptive only. Future work could test which economic or infrastructure variables are most strongly associated with longer outage duration.
+")
+```
+
+```{r q4-text, results='asis'}
+cat("
+## Question #4: [Name - Question Statement] (if applicable)
+
+## Q4: Variables & Approach
+
+## Q4: Visualization
+
+## Q4: Summary Table
+")
+```
+
+```{r limitations-text, results='asis'}
+cat("
+## Overall Limitations
+
+The raw CATF dataset contains multiple rows for the same country, so the analysis depends on collapsing those repeated entries into a single country-level value. In this project, numeric variables were aggregated using the median, which is robust, but different aggregation choices could slightly change the results.
+
+Some countries also have missing values for important variables such as SAIDI, which reduces the number of countries included in certain analyses. This means that findings may not represent the full set of African countries in the dataset.
+
+In addition, the project uses country-level data, which hides variation within countries. Electricity access and reliability can differ sharply between urban and rural areas or between regions, so national summaries may oversimplify local conditions.
+
+Finally, this project is descriptive. It identifies patterns and associations in the data, but it does not establish causation. Future work could use more complete, standardized, and time-specific data to examine how electricity reliability and access change over time and what factors most strongly influence them.
+")
+```
+
+```{r conclusion-text, results='asis'}
+cat("
+## Overall Conclusion
+
+**Key Findings:**
+
+- [Finding 1 related to theme]
+- [Finding 2 related to theme]
+- [Finding 3 related to theme]
+
+**Connection to Theme:**
+
+[How findings relate back to unifying theme]
+")
+```
+
+```{r refs-text, results='asis'}
+cat("
+## References & Acknowledgements (if applicable)
+
+**References:**
+
+[Citation 1, if applicable]
+
+**Acknowledgements:**
+
+[Any acknowledgements, if applicable]
+")
+```
