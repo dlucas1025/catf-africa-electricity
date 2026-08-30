@@ -4,7 +4,7 @@
 
 ## Course context
 
-University of Toronto STA130 — Winter 2026, group of 4 students.
+University of Toronto STA130 - Winter 2026, group of 4 students.
 
 ## My contribution
 
